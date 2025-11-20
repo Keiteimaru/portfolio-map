@@ -1,7 +1,9 @@
 <template>
-  <div class="card" @click="$emit('showArticle', data)">
+  <div class="card" role="button" :aria-label="`${data.name}の詳細を表示`" @click="$emit('showArticle', data)">
     <div class="card__container">
-      <img class="card__image" :src="data.image || noimage" alt="">
+      <div class="card__image">
+        <img :src="data.image || noimage" alt="">
+      </div>
     </div>
     <div class="card__container2">
       <p class="card__title">{{ data.name }}</p>
@@ -34,6 +36,7 @@ const emits = defineEmits([
   display: grid;
   grid-template-columns: auto 1fr;
   gap: 0 8px;
+  cursor: pointer;
   &__container{
     position: relative;
   }
@@ -45,11 +48,16 @@ const emits = defineEmits([
   }
   &__image{
     overflow: hidden;
-    border: solid 1px var(--color-surface-container-low);
     border-radius: 12px;
-    aspect-ratio: 1 / 1;
     width: 92px;
-    object-fit: cover;
+    height: 92px;
+    > img{
+      display: block;
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      transition: all 0.3s;
+    }
   }
   &__title{
     font-size: 14px;
@@ -65,9 +73,18 @@ const emits = defineEmits([
       font-size: 1em;
     }
   }
+  $this: &;
+  &:hover{
+    #{$this}__image{
+      > img{
+        transform: scale(1.1);
+      }
+    }
+  }
   @include mixin.mq(md){
     &__image{
       width: 112px;
+      height: 112px;
     }
     &__title{
       font-size: 16px;

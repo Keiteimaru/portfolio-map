@@ -8,30 +8,30 @@
     </div>
     <div class="map__container2">
       <div class="canvas">
-        <div id="canvas" class="canvas__body" role="region" aria-label="地図表示エリア"></div>
+        <div id="canvas" class="canvas__body"></div>
       </div>
     </div>
     <div class="map__container3">
       <Transition name="fade" mode="out-in">
-        <nav class="navigation" v-if="!appArticle" key="navigation" role="navigation" aria-label="観光スポット一覧">
+        <nav class="navigation" v-if="!appArticle" key="navigation" role="navigation" aria-label="スポット一覧">
           <div class="navigation__container">
             <CategoryComponent :categories="appCategoryData" :selected-category="appSelectedCategory" @change-category="updateCategory($event)" />
           </div>
           <div class="navigation__container2">
             <Transition name="fade-list" mode="out-in">
-              <ul v-if="appContentList && appContentList.length > 0" :key="appSelectedCategory" class="content-list" role="list" aria-live="polite">
+              <ul v-if="appContentList && appContentList.length > 0" :key="appSelectedCategory" class="content-list" role="list">
                 <li class="content-list__item" v-for="item in appContentList" :key="item.id" role="listitem">
                   <CardComponent :data="item" @show-article="showArticle($event, true)" />
                 </li>
               </ul>
-              <div v-else class="content-list-empty" role="status" aria-live="polite">
+              <div v-else class="content-list-empty">
                 ごめんなさい！<br>
                 絶賛、情報収集中です。
               </div>
             </Transition>
           </div>
         </nav>
-        <article class="content" v-else key="content" role="article" aria-label="スポット情報">
+        <article class="content" v-else key="content" role="article" aria-label="スポット詳細">
           <div class="content__container">
             <ClusterComponent v-if="appCluster" :data="appCluster" :article="appArticle" @show-article="showArticle($event)" />
             <Transition name="fade" mode="out-in">
@@ -39,7 +39,7 @@
             </Transition>
           </div>
           <div class="content__container2">
-            <button class="content__close" @click="closeArticle()" aria-label="記事を閉じる" type="button"><span class="material-symbols-rounded" aria-hidden="true">close</span></button>
+            <button class="content__close" @click="closeArticle()" aria-label="詳細を閉じる" type="button"><span class="material-symbols-rounded" aria-hidden="true">close</span></button>
           </div>
         </article>
       </Transition>
@@ -348,7 +348,7 @@ const showArticle = (articleData, updateZoom = false) => {
 
         // 中心座標をマーカー座標に更新
         const currentZoom = appMap.value.getZoom();
-        const activeZoom = updateZoom && currentZoom < 14 ? 14 : currentZoom;
+        const activeZoom = updateZoom && currentZoom < 12 ? 12 : currentZoom;
         const targetCenter = appCluster.value ? [appCluster.value[0].longitude, appCluster.value[0].latitude] : [appArticle.value.longitude, appArticle.value.latitude];
         appMap.value.easeTo({
           center: targetCenter,
@@ -547,6 +547,10 @@ const closeArticle = () => {
     height: 40px;
     background-color: var(--color-secondary);
     color: var(--color-on-secondary);
+    transition: opacity .2s;
+    &:hover{
+      opacity: .8;
+    }
   }
   @include mixin.mq(md){
     width: var(--size-content-width);
