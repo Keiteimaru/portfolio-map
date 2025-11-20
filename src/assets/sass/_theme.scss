@@ -1,0 +1,62 @@
+:root {
+  --color-primary: rgb(91 88 145);
+  --color-surface-tint: rgb(91 88 145);
+  --color-on-primary: rgb(255 255 255);
+  --color-primary-container: rgb(227 223 255);
+  --color-on-primary-container: rgb(67 64 120);
+  --color-secondary: rgb(94 92 113);
+  --color-on-secondary: rgb(255 255 255);
+  --color-secondary-container: rgb(227 224 249);
+  --color-on-secondary-container: rgb(70 69 89);
+  --color-tertiary: rgb(122 83 103);
+  --color-on-tertiary: rgb(255 255 255);
+  --color-tertiary-container: rgb(255 216 234);
+  --color-on-tertiary-container: rgb(96 59 79);
+  --color-error: rgb(186 26 26);
+  --color-on-error: rgb(255 255 255);
+  --color-error-container: rgb(255 218 214);
+  --color-on-error-container: rgb(147 0 10);
+  --color-background: rgb(252 248 255);
+  --color-on-background: rgb(28 27 33);
+  --color-surface: rgb(252 248 255);
+  --color-on-surface: rgb(28 27 33);
+  --color-surface-variant: rgb(228 225 236);
+  --color-on-surface-variant: rgb(71 70 79);
+  --color-outline: rgb(120 118 128);
+  --color-outline-variant: rgb(200 197 208);
+  --color-shadow: rgb(0 0 0);
+  --color-scrim: rgb(0 0 0);
+  --color-inverse-surface: rgb(49 48 54);
+  --color-inverse-on-surface: rgb(243 239 247);
+  --color-inverse-primary: rgb(196 192 255);
+  --color-primary-fixed: rgb(227 223 255);
+  --color-on-primary-fixed: rgb(23 19 74);
+  --color-primary-fixed-dim: rgb(196 192 255);
+  --color-on-primary-fixed-variant: rgb(67 64 120);
+  --color-secondary-fixed: rgb(227 224 249);
+  --color-on-secondary-fixed: rgb(26 26 44);
+  --color-secondary-fixed-dim: rgb(199 196 220);
+  --color-on-secondary-fixed-variant: rgb(70 69 89);
+  --color-tertiary-fixed: rgb(255 216 234);
+  --color-on-tertiary-fixed: rgb(47 17 35);
+  --color-tertiary-fixed-dim: rgb(234 185 209);
+  --color-on-tertiary-fixed-variant: rgb(96 59 79);
+  --color-surface-dim: rgb(220 216 224);
+  --color-surface-bright: rgb(252 248 255);
+  --color-surface-container-lowest: rgb(255 255 255);
+  --color-surface-container-low: rgb(246 242 250);
+  --color-surface-container: rgb(240 236 244);
+  --color-surface-container-high: rgb(235 231 239);
+  --color-surface-container-highest: rgb(229 225 233);
+
+  --color-black: rgb(0 0 0);
+  --color-white: rgb(255 255 255)
+}
+
+
+
+:root{
+  --size-page-padding-mb: 12px;
+  --size-page-padding-dt: 20px;
+  --size-content-width: 440px;
+}

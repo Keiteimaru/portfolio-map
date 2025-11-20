@@ -1,0 +1,32 @@
+@use "variable" as *;
+
+// メディアクエリ mixin
+@mixin mq($breakpoint) {
+  @if $breakpoint == sm {
+    @media screen and (min-width: $breakpoint-sm) {
+      @content;
+    }
+  } @else if $breakpoint == md {
+    @media screen and (min-width: $breakpoint-md) {
+      @content;
+    }
+  } @else if $breakpoint == lg {
+    @media screen and (min-width: $breakpoint-lg) {
+      @content;
+    }
+  }
+}
+
+// テキスト省略 mixin
+@mixin line-clamp($lines: 1) {
+  @if $lines == 1 {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  } @else {
+    display: -webkit-box;
+    -webkit-box-orient: vertical;
+    -webkit-line-clamp: $lines;
+    overflow: hidden;
+  }
+}

@@ -1,0 +1,27 @@
+{
+  "name": "kawanishi",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "@fontsource/noto-sans-jp": "^5.2.8",
+    "@fontsource/poppins": "^5.2.7",
+    "@turf/turf": "^7.3.0",
+    "@vueuse/head": "^2.0.0",
+    "mapbox-gl": "^3.16.0",
+    "material-symbols": "^0.39.4",
+    "swiper": "^12.0.3",
+    "vue": "^3.5.24",
+    "vue-router": "^4.6.3"
+  },
+  "devDependencies": {
+    "@vitejs/plugin-vue": "^6.0.1",
+    "sass-embedded": "^1.93.3",
+    "vite": "^7.2.2"
+  }
+}
