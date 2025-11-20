@@ -1,190 +1,68 @@
 <template>
-  <Teleport to="body">
-    <Transition name="dialog">
-      <div v-if="modelValue" class="dialog-overlay" @click="handleOverlayClick">
-        <div class="dialog-container" role="dialog" aria-modal="true">
-          <div class="dialog-header" v-if="$slots.header || title">
-            <slot name="header">
-              <h2 class="dialog-title">{{ title }}</h2>
-            </slot>
-            <button 
-              v-if="showClose" 
-              class="dialog-close" 
-              @click="close"
-              aria-label="閉じる"
-            >
-              ×
-            </button>
-          </div>
-          
-          <div class="dialog-body">
-            <slot></slot>
-          </div>
-          
-          <div class="dialog-footer" v-if="$slots.footer">
-            <slot name="footer"></slot>
-          </div>
-        </div>
+  <div class="dialog">
+    <div class="dialog__container" role="dialog" aria-modal="true">
+      <p class="dialog__title">ただいま、情報を準備中です</p>
+      <p class="dialog__text">川西市の歴史、隠れた魅力、アクセス方法など、役立つ情報をまもなく公開します。ご期待ください！</p>
+      <div class="dialog__navigation">
+        <ButtonComponents size="sm" @click="$emit('close')">とじる</ButtonComponents>
       </div>
-    </Transition>
-  </Teleport>
+    </div>
+    <div class="dialog__overlay" @click="$emit('close')"></div>
+  </div>
 </template>
 
 <script setup>
-import { watch } from 'vue'
 
-const props = defineProps({
-  modelValue: {
-    type: Boolean,
-    default: false
-  },
-  title: {
-    type: String,
-    default: ''
-  },
-  showClose: {
-    type: Boolean,
-    default: true
-  },
-  closeOnOverlay: {
-    type: Boolean,
-    default: true
-  },
-  width: {
-    type: String,
-    default: '500px'
-  }
-})
+import ButtonComponents from '@/components/Button.vue';
 
-const emit = defineEmits(['update:modelValue', 'close'])
+const emit = defineEmits([
+  'close'
+])
 
-const close = () => {
-  emit('update:modelValue', false)
-  emit('close')
-}
-
-const handleOverlayClick = (e) => {
-  if (props.closeOnOverlay && e.target.classList.contains('dialog-overlay')) {
-    close()
-  }
-}
-
-// ESCキーで閉じる
-watch(() => props.modelValue, (newVal) => {
-  if (newVal) {
-    const handleEscape = (e) => {
-      if (e.key === 'Escape') {
-        close()
-      }
-    }
-    document.addEventListener('keydown', handleEscape)
-    document.body.style.overflow = 'hidden'
-    
-    return () => {
-      document.removeEventListener('keydown', handleEscape)
-      document.body.style.overflow = ''
-    }
-  } else {
-    document.body.style.overflow = ''
-  }
-})
 </script>
 
-<style scoped>
-.dialog-overlay {
-  position: fixed;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
-  background-color: rgba(0, 0, 0, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
+<style lang="scss" scoped>
+
+.dialog{
   z-index: 1000;
-}
-
-.dialog-container {
-  background: white;
-  border-radius: 8px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.15);
-  max-width: v-bind(width);
-  width: 90%;
-  max-height: 90vh;
-  overflow: auto;
-  display: flex;
-  flex-direction: column;
-}
-
-.dialog-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  padding: 20px 24px;
-  border-bottom: 1px solid #eee;
-}
-
-.dialog-title {
-  margin: 0;
-  font-size: 1.25rem;
-  font-weight: 600;
-  color: #333;
-}
-
-.dialog-close {
-  background: none;
-  border: none;
-  font-size: 28px;
-  line-height: 1;
-  cursor: pointer;
-  color: #999;
-  padding: 0;
-  width: 32px;
-  height: 32px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 4px;
-  transition: all 0.2s;
-}
-
-.dialog-close:hover {
-  background-color: #f5f5f5;
-  color: #333;
-}
-
-.dialog-body {
-  padding: 24px;
-  flex: 1;
-  overflow-y: auto;
-}
-
-.dialog-footer {
-  padding: 16px 24px;
-  border-top: 1px solid #eee;
-  display: flex;
-  justify-content: flex-end;
-  gap: 12px;
-}
-
-/* トランジション */
-.dialog-enter-active,
-.dialog-leave-active {
-  transition: opacity 0.3s ease;
-}
-
-.dialog-enter-active .dialog-container,
-.dialog-leave-active .dialog-container {
-  transition: transform 0.3s ease;
-}
-
-.dialog-enter-from,
-.dialog-leave-to {
-  opacity: 0;
-}
-
-.dialog-enter-from .dialog-container,
-.dialog-leave-to .dialog-container {
-  transform: scale(0.9);
+  position: fixed;
+  inset: 0;
+  &__overlay{
+    z-index: 1;
+    position: absolute;
+    inset: 0;
+    background-color: rgba(0 0 0 / 50%);
+  }
+  &__container{
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    z-index: 2;
+    position: absolute;
+    inset: 0;
+    margin: auto;
+    padding: 16px;
+    border-radius: 20px;
+    width: min(400px, calc(100dvw - 40px));
+    height: max-content;
+    background-color: var(--color-surface);
+  }
+  &__title{
+    text-align: center;
+    font-size: 16px;
+    font-weight: 700;
+  }
+  &__text{
+    margin: 16px 0 0;
+    text-align: center;
+    font-size: 14px;
+    color: var(--color-on-surface-variant);
+  }
+  &__navigation{
+    margin: 16px 0 0;
+    > *{
+      min-width: 100px;
+    }
+  }
 }
 </style>

@@ -31,7 +31,7 @@
 import noimage from '@/assets/images/dummy.jpg';
 
 const props = defineProps({
-  data: Array
+  data: Object
 });
 
 </script>
@@ -112,4 +112,5 @@ const props = defineProps({
     }
   }
 }
+
 </style>

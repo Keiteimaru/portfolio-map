@@ -35,7 +35,7 @@ import noimage from '@/assets/images/dummy.jpg';
 
 const props = defineProps({
   data: Array,
-  article: Array
+  article: Object
 });
 const emits = defineEmits([
   'showArticle'

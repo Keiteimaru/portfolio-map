@@ -1,97 +1,105 @@
 <template>
   <div class="map">
     <div class="map__container">
-      <div class="header">
-        <p class="header-logo"><img src="@/assets/images/logo.svg" alt="川西案内センター（仮）"></p>
-        <button class="header-access" href="">サイトのご案内</button>
-      </div>
+      <header class="header">
+        <h1 class="header-logo"><img src="@/assets/images/logo.svg" alt="川西案内センター（仮）"></h1>
+        <ButtonComponents class="header-access" variant="secondary" size="sm" @on-click="appDialogVisible = true">サイトのご案内</ButtonComponents>
+      </header>
     </div>
     <div class="map__container2">
       <div class="canvas">
-        <div id="canvas" class="canvas__body"></div>
+        <div id="canvas" class="canvas__body" role="region" aria-label="地図表示エリア"></div>
       </div>
     </div>
     <div class="map__container3">
-      <div class="navigation" v-if="!appArticle">
-        <div class="navigation__container">
-          <CategoryComponent :categories="categories" :selected-category="selectedCategory" @change-category="updateCategory($event)" />
-        </div>
-        <div class="navigation__container2">
-          <ul v-if="activeData" class="content-list">
-            <li class="content-list__item" v-for="item in activeData" :key="item.id">
-              <CardComponent :data="item" @show-article="showArticle($event)" />
-            </li>
-          </ul>
-        </div>
-      </div>
-
-      <div class="content" v-if="appArticle">
-        <div class="content__container">
-          <ClusterComponent v-if="appCluster" :data="appCluster" :article="appArticle" @show-article="showArticle($event)" />
-          <ArticleComponent :data="appArticle" />
-        </div>
-        <div class="content__container2">
-          <button class="content__close" @click="closeArticle()">とじる</button>
-        </div>
-      </div>
-
+      <Transition name="fade" mode="out-in">
+        <nav class="navigation" v-if="!appArticle" key="navigation" role="navigation" aria-label="観光スポット一覧">
+          <div class="navigation__container">
+            <CategoryComponent :categories="appCategoryData" :selected-category="appSelectedCategory" @change-category="updateCategory($event)" />
+          </div>
+          <div class="navigation__container2">
+            <Transition name="fade-list" mode="out-in">
+              <ul v-if="appContentList && appContentList.length > 0" :key="appSelectedCategory" class="content-list" role="list" aria-live="polite">
+                <li class="content-list__item" v-for="item in appContentList" :key="item.id" role="listitem">
+                  <CardComponent :data="item" @show-article="showArticle($event, true)" />
+                </li>
+              </ul>
+              <div v-else class="content-list-empty" role="status" aria-live="polite">
+                ごめんなさい！<br>
+                絶賛、情報収集中です。
+              </div>
+            </Transition>
+          </div>
+        </nav>
+        <article class="content" v-else key="content" role="article" aria-label="スポット情報">
+          <div class="content__container">
+            <ClusterComponent v-if="appCluster" :data="appCluster" :article="appArticle" @show-article="showArticle($event)" />
+            <Transition name="fade" mode="out-in">
+              <ArticleComponent :key="appArticle?.id" :data="appArticle" />
+            </Transition>
+          </div>
+          <div class="content__container2">
+            <button class="content__close" @click="closeArticle()" aria-label="記事を閉じる" type="button"><span class="material-symbols-rounded" aria-hidden="true">close</span></button>
+          </div>
+        </article>
+      </Transition>
     </div>
   </div>
+  <DialogComponents v-if="appDialogVisible" @close="appDialogVisible = false" />
 </template>
 
 <script setup>
 
 import { MAPBOX_ACCESS_TOKEN } from '@/constants/index';
-import { ref, shallowRef, provide, computed, onMounted, watch } from 'vue';
+import { ref, shallowRef, onMounted, onBeforeUnmount, watch, nextTick } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
-import { Swiper, SwiperSlide } from 'swiper/vue';
-import 'swiper/css';
-import { Navigation } from 'swiper/modules';
-import 'swiper/css/navigation';
 
-import spotsData from '@/assets/data/spots.json';
-import noimage from '@/assets/images/dummy.jpg';
-
-/** components 読込 */
 import CardComponent from '@/components/Card.vue';
 import ArticleComponent from '@/components/Article.vue';
 import CategoryComponent from '@/components/Category.vue';
 import ClusterComponent from '@/components/Cluster.vue';
-import DialogComponents from '@/components/Dialog.vue'
+import DialogComponents from '@/components/Dialog.vue';
+import ButtonComponents from '@/components/Button.vue';
 
 const router = useRouter();
 const route = useRoute();
 
+import spotsData from '@/assets/data/spots.json';
+import noimage from '@/assets/images/dummy.jpg';
+
 const appMap = shallowRef(null);
 const appMarkers = ref([]);
 const appMarkersOnScreen = ref([]);
-const isUpdatingMarkers = ref(false);
-let updateMarkerFrame = null;
 
+let appMarkerUpdateFrame = null;
+const appMarkerUpdaing = ref(false);
+
+const appContentList = ref(null);
 const appArticle = ref(null);
 const appCluster = ref(null);
+const appDialogVisible = ref(false);
 
-const selectedCategory = ref(0);
-const categories = ref([
+const appSelectedCategory = ref(0);
+const appCategoryData = ref([
   { id: 0, name: 'すべて' },
-  { id: 99, name: '紅葉' },
-  { id: 1, name: '名所' },
-  { id: 2, name: 'ライフスタイル' },
-  { id: 3, name: 'テクノロジー' },
-  { id: 4, name: 'ライフスタイル' },
-  { id: 5, name: '旅行' },
-  { id: 6, name: 'グルメ' },
+  { id: 100, name: '紅葉' },
+  { id: 1, name: '観光名所' },
+  { id: 2, name: '自然・景観' },
+  { id: 3, name: 'グルメ' },
+  { id: 4, name: 'ショッピング' },
+  { id: 5, name: '宿泊' },
+  { id: 6, name: '体験' },
+  { id: 7, name: '交通' },
 ]);
 
-const activeData = ref(null);
 
 
 onMounted(() => {
 
   // コンテンツデータの取得
-  activeData.value = spotsData;
+  appContentList.value = spotsData;
 
   // GeoJSONに変換
   const geojson = convertGeojson(spotsData);
@@ -101,8 +109,8 @@ onMounted(() => {
   appMap.value = new mapboxgl.Map({
     container: 'canvas',
     style: 'mapbox://styles/keiteimaru/cmi5hrq7i00rz01su74zu28qs',
-    center: [135.41155425720257, 34.874942602125884],
-    zoom: 12,
+    center: [135.41853216103894, 34.88712146525946],
+    zoom: window.innerWidth <= 1024 ? 11 : 12,
     language: 'ja',
     attributionControl: false,
   });
@@ -112,7 +120,7 @@ onMounted(() => {
       type: 'geojson',
       data: geojson,
       cluster: true,
-      clusterRadius: 45
+      clusterRadius: 55
     });
     appMap.value.addLayer({
       'id': 'marker',
@@ -161,11 +169,11 @@ const convertGeojson = (data) => {
  */
 const updateMarker = async() => {
 
-  if (isUpdatingMarkers.value) return;
-  if (updateMarkerFrame) cancelAnimationFrame(updateMarkerFrame);
+  if (appMarkerUpdaing.value) return;
+  if (appMarkerUpdateFrame) cancelAnimationFrame(appMarkerUpdateFrame);
 
-  updateMarkerFrame = requestAnimationFrame(async() => {
-    isUpdatingMarkers.value = true;
+  appMarkerUpdateFrame = requestAnimationFrame(async() => {
+    appMarkerUpdaing.value = true;
     
     try {
       if (!appMap.value.getLayer('marker')) return;
@@ -183,6 +191,8 @@ const updateMarker = async() => {
           const data = isCluster ? markerData[0] : markerData;
           const count = isCluster ? props.point_count : 0;
 
+          if (!data) continue;
+
           marker = appMarkers.value[id] = new mapboxgl.Marker({
             element: createMarkerElement(data, count),
             anchor: 'bottom'
@@ -194,11 +204,20 @@ const updateMarker = async() => {
         if (!appMarkersOnScreen.value[id]) {
           marker.addTo(appMap.value);
           if (!marker.clickHandler) {
-            const markerData = props.cluster ? await getClusterMarkerData(props.cluster_id) : props;
+            const isCluster = props.cluster;
+            const markerData = isCluster ? await getClusterMarkerData(props.cluster_id) : props;
             marker.clickHandler = () => {
-              props.cluster ? showArticle(markerData[0], markerData) : showArticle(markerData, []);
+              isCluster ? showArticle(markerData[0]) : showArticle(markerData);
+              appCluster.value = isCluster ? markerData : null;
+            };
+            marker.keyHandler = (e) => {
+              if (e.key === 'Enter' || e.key === ' ') {
+                e.preventDefault();
+                marker.clickHandler();
+              }
             };
             marker.getElement().addEventListener('click', marker.clickHandler);
+            marker.getElement().addEventListener('keydown', marker.keyHandler);
           }
         }
       }
@@ -211,7 +230,7 @@ const updateMarker = async() => {
     } catch (error) {
       console.error(error);
     } finally {
-      isUpdatingMarkers.value = false;
+      appMarkerUpdaing.value = false;
     }
   });
 }
@@ -241,9 +260,9 @@ const updateMarkerZindex = () => {
  * クラスターマーカーのデータ取得
  */
 const getClusterMarkerData = async(id) => {
-  return new Promise((resolve, reject) => {
+  return new Promise((resolve) => {
     appMap.value.getSource('marker').getClusterLeaves(id, 99, 0, (err, d) => {
-      const newArray = d ? d.map(item => (item.properties)) : [];
+      let newArray = d ? d.map(item => item.properties) : [];
       resolve(newArray);
     });
   });
@@ -265,6 +284,9 @@ const createMarkerElement = (data, count = 0) => {
 
   element.id = `marker-${data.id}`;
   element.className = 'marker' + appendClass;
+  element.setAttribute('role', 'button');
+  element.setAttribute('tabindex', '0');
+  element.setAttribute('aria-label', `${data.name}の詳細を表示`);
   element.insertAdjacentHTML( 'beforeend', `
     <div class="marker__container">
       <div class="marker__container__body">
@@ -273,8 +295,8 @@ const createMarkerElement = (data, count = 0) => {
       </div>
       <div class="marker__container__tip"></div>
     </div>
-    <div class="marker__shadow"></div>
-    <div class="marker__name">${data.name}</div>
+    <div class="marker__shadow" aria-hidden="true"></div>
+    <div class="marker__name" aria-hidden="true">${data.name}</div>
   `);
 
   return element;
@@ -286,14 +308,18 @@ const createMarkerElement = (data, count = 0) => {
  */
 const updateCategory = (id) => {
 
-  selectedCategory.value = id;
+  appSelectedCategory.value = id;
 
-  // 一覧データをフィルター
-  activeData.value = id === 0 ? spotsData : spotsData.filter(spot => spot.category == id);
+  // 一覧データをフィルター(カンマ区切りのcategoryにも対応)
+  appContentList.value = id === 0 ? spotsData : spotsData.filter(spot => {
+    const categories = spot.category.toString().split(',').map(c => c.trim());
+    return categories.includes(id.toString());
+  });
 
   // マップデータをフィルター(数値を文字列に変換)
-  const geojson = convertGeojson(activeData.value);
+  const geojson = convertGeojson(appContentList.value);
   appMap.value.getSource('marker').setData(geojson);
+  
 
   // 既存のマーカーを全て削除
   for (const key in appMarkersOnScreen.value) {
@@ -302,42 +328,44 @@ const updateCategory = (id) => {
   appMarkersOnScreen.value = {};
   appMarkers.value = {};
 
+  updateMarker();
+  updateMarkerZindex();
+
 }
 
 
 /**
  * 記事の表示処理
  */
-const showArticle = (articleData, clusterData) => {
+const showArticle = (articleData, updateZoom = false) => {
   appArticle.value = articleData;
-  appMap.value.easeTo({
-    center: [articleData.longitude, articleData.latitude],
-    padding: 20
-  });
-  
-  if (clusterData && clusterData.length > 0) {
-    appCluster.value = clusterData;
 
-    // クラスターマーカーのDOM要素を探して位置を更新
-    const targetMarkerId = `marker-${clusterData[0].id}`;
-    for (const id in appMarkersOnScreen.value) {
-      if (id.startsWith('CL')) {
-        const clusterMarker = appMarkersOnScreen.value[id];
-        const markerElement = clusterMarker.getElement();
-        if (markerElement && markerElement.id === targetMarkerId) {
-          clusterMarker.setLngLat([articleData.longitude, articleData.latitude]);
-          
-          // marker__textの内容を更新
-          const textElement = markerElement.querySelector('.marker__text');
-          if (textElement) {
-            textElement.textContent = articleData.name;
-          }
-          
-          break;
-        }
-      }
-    }
-  }
+  nextTick(() => {
+    setTimeout(() => {
+      appMap.value.resize();
+      requestAnimationFrame(() => {
+
+        // 中心座標をマーカー座標に更新
+        const currentZoom = appMap.value.getZoom();
+        const activeZoom = updateZoom && currentZoom < 14 ? 14 : currentZoom;
+        const targetCenter = appCluster.value ? [appCluster.value[0].longitude, appCluster.value[0].latitude] : [appArticle.value.longitude, appArticle.value.latitude];
+        appMap.value.easeTo({
+          center: targetCenter,
+          zoom: activeZoom,
+          padding: 20,
+          duration: 500
+        });
+
+        // easeToのアニメーション完了後にマーカーの選択状態を更新
+        setTimeout(() => {
+          const targetId = appCluster.value ? appCluster.value[0].id : appArticle.value.id;
+          document.querySelectorAll('.marker.is-selected').forEach(el => el.classList.remove('is-selected'));
+          document.getElementById(`marker-${targetId}`)?.classList.add('is-selected');
+        }, 550);
+
+      });
+    }, 300);
+  });
 }
 
 
@@ -345,32 +373,19 @@ const showArticle = (articleData, clusterData) => {
  * 記事の非表示処理
  */
 const closeArticle = () => {
-
-  // クラスターマーカーの場合、一件目のデータに戻す
-  if (appCluster.value && appCluster.value.length > 0) {
-    const originalData = appCluster.value[0];
-    const targetMarkerId = `marker-${originalData.id}`;
-    
-    for (const id in appMarkersOnScreen.value) {
-      if (id.startsWith('CL')) {
-        const clusterMarker = appMarkersOnScreen.value[id];
-        const markerElement = clusterMarker.getElement();
-        if (markerElement && markerElement.id === targetMarkerId) {
-          clusterMarker.setLngLat([originalData.longitude, originalData.latitude]);
-          
-          const textElement = markerElement.querySelector('.marker__text');
-          if (textElement) {
-            textElement.textContent = originalData.name;
-          }
-          
-          break;
-        }
-      }
-    }
-  }
-  
   appCluster.value = null;
   appArticle.value = null;
+
+  nextTick(() => {
+    setTimeout(() => {
+      const center = appMap.value.getCenter();
+      appMap.value.resize();
+      appMap.value.setCenter(center);
+
+      // マーカーの選択状態を解除
+      document.querySelectorAll('.marker.is-selected').forEach(el => el.classList.remove('is-selected'));
+    }, 550);
+  });
 }
 
 </script>
@@ -434,24 +449,6 @@ const closeArticle = () => {
   }
 }
 
-.header-access{
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 1.5em;
-  border-radius: 18px;
-  height: 36px;
-  font-size: 12px;
-  font-weight: 700;
-  background-color: var(--color-secondary);
-  color: var(--color-on-secondary);
-  @include mixin.mq(md){
-    border-radius: 24px;
-    height: 48px;
-    font-size: 15px;
-  }
-}
-
 .canvas{
   overflow: hidden;
   position: relative;
@@ -500,6 +497,23 @@ const closeArticle = () => {
     gap: 12px 0;
     padding: 0;
   }
+  &.fade-list-enter-active,
+  &.fade-list-leave-active {
+    overflow-y: hidden;
+  }
+}
+
+.content-list-empty{
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 100%;
+  text-align: center;
+  font-size: 14px;
+  color: var(--color-on-surface-variant);
+  @include mixin.mq(md){
+    font-size: 16px;
+  }
 }
 
 .content{
@@ -527,9 +541,9 @@ const closeArticle = () => {
     display: flex;
     align-items: center;
     justify-content: center;
-    border-radius: 18px;
-    width: 100px;
-    height: 36px;
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
     background-color: var(--color-secondary);
     color: var(--color-on-secondary);
   }
@@ -540,11 +554,40 @@ const closeArticle = () => {
       padding: 20px 0 0;
     }
     &__close{
-      border-radius: 24px;
-      width: 100%;
+      width: 48px;
       height: 48px;
     }
   }
+}
+
+.fade-enter-active,
+.fade-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.fade-enter-from,
+.fade-leave-to {
+  opacity: 0;
+}
+
+.fade-enter-to,
+.fade-leave-from {
+  opacity: 1;
+}
+
+.fade-list-enter-active,
+.fade-list-leave-active {
+  transition: opacity 0.3s ease;
+}
+
+.fade-list-enter-from,
+.fade-list-leave-to {
+  opacity: 0;
+}
+
+.fade-list-enter-to,
+.fade-list-leave-from {
+  opacity: 1;
 }
 
 </style>
@@ -555,6 +598,13 @@ const closeArticle = () => {
   display: flex;
   flex-direction: column;
   align-items: center;
+  cursor: pointer;
+  
+  &:focus {
+    outline: 2px solid var(--color-primary);
+    outline-offset: 2px;
+  }
+  
   &__container{
     display: flex;
     flex-direction: column;
@@ -657,9 +707,13 @@ const closeArticle = () => {
   $this: &;
   &.is-selected{
     z-index: 99999999!important;
-    #{$this}__body{
+    #{$this}__container{
       transform-origin: bottom center;
       animation: markerSelectedPulse 2s ease-in-out infinite;
+    }
+    #{$this}__name{
+      font-size: 13px;
+      color: var(--color-primary);
     }
   }
 }
