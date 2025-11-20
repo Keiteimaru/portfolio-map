@@ -116,6 +116,7 @@ onMounted(() => {
   });
 
   appMap.value .on('load', () => {
+    appMap.value.resize();
     appMap.value.addSource('marker', {
       type: 'geojson',
       data: geojson,
