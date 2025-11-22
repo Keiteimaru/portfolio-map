@@ -645,8 +645,8 @@ const closeArticle = () => {
     left: 0;
     margin: 0 auto;
     border-radius: 50%;
-    width: 16px;
-    height: 6px;
+    width: 12px;
+    height: 5px;
     background-color: rgba(0 0 0 / 20%);
     transform: translateY(50%);
   }
@@ -668,7 +668,7 @@ const closeArticle = () => {
     width: max-content;
     max-width: 12em;
     line-height: 1.3;
-    font-size: 12px;
+    font-size: 11px;
     font-weight: 700;
     color: var(--color-on-surface);
     pointer-events: none;
@@ -711,22 +711,22 @@ const closeArticle = () => {
 
   $this: &;
   &.is-selected{
-    z-index: 99999999!important;
+    z-index: 999999!important;
     #{$this}__container{
       transform-origin: bottom center;
-      animation: markerSelectedPulse 2s ease-in-out infinite;
+      animation: markerSelectedAnimation 2s ease-in-out infinite;
     }
     #{$this}__name{
-      font-size: 13px;
+      font-size: 12px;
       color: var(--color-primary);
     }
   }
 }
 
-@keyframes markerSelectedPulse {
-  0%   { transform: scale(1.1); opacity: 1; }
-  50%  { transform: scale(1.3); opacity: 0.9; }
-  100% { transform: scale(1.1); opacity: 1; }
+@keyframes markerSelectedAnimation {
+  0% { transform: scale(1.1); }
+  50% { transform: scale(1.2); }
+  100% { transform: scale(1.1); }
 }
 
 </style>

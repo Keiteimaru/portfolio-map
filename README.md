@@ -1,5 +1,11 @@
-# Vue 3 + Vite
+# 新しいマッププロジェクト（開発中）
+このリポジトリは、以下の目的のために開発中の Webアプリケーション です。
 
-This template should help get you started developing with Vue 3 in Vite. The template uses Vue 3 `<script setup>` SFCs, check out the [script setup docs](https://v3.vuejs.org/api/sfc-script-setup.html#sfc-script-setup) to learn more.
+- ポートフォリオ
+- マップを利用したサービスのUI/UX検証
+- Mapboxの技術検証
 
-Learn more about IDE Support for Vue in the [Vue Docs Scaling up Guide](https://vuejs.org/guide/scaling-up/tooling.html#ide-support).
+現在 **開発途中** のため、仕様追加・UI改善・コードの整理を継続しています。
+企画・進行状況の詳細はこちら（Figma）
+https://www.figma.com/design/j3bv24B1nA4ZLdHVV0eTGf/%E6%96%B0%E3%81%97%E3%81%84%E3%83%9E%E3%83%83%E3%83%97%E3%83%97%E3%83%AD%E3%82%B8%E3%82%A7%E3%82%AF%E3%83%88?m=auto&t=AMECaFxSelJ3qRld-6
+
