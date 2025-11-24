@@ -23,6 +23,9 @@ export default defineConfig(({ mode }) => {
             if (['.jpg', '.jpeg', '.png', '.gif', '.svg', '.webp'].includes(ext)) {
               return 'assets/images/[name].[hash][extname]';
             }
+            if (['.woff', '.woff2', '.ttf', '.otf', '.eot'].includes(ext)) {
+              return 'assets/fonts/[name].[hash][extname]';
+            }
             return 'assets/[name].[hash][extname]';
           }
         }

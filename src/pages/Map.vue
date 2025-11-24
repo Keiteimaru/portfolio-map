@@ -433,10 +433,7 @@ const closeArticle = () => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  height: 56px;
-  @include mixin.mq(md){
-    height: 80px;
-  }
+  height: var(--size-header-height);
 }
 
 .header-logo{
@@ -481,7 +478,7 @@ const closeArticle = () => {
   }
   @include mixin.mq(md){
     gap: 20px 0;
-    width: var(--size-content-width);
+    width: var(--size-sidebar-width);
     height: 100%;
   }
 }
@@ -553,7 +550,7 @@ const closeArticle = () => {
     }
   }
   @include mixin.mq(md){
-    width: var(--size-content-width);
+    width: var(--size-sidebar-width);
     height: 100%;
     &__container2{
       padding: 20px 0 0;

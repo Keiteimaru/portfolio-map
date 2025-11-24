@@ -9,3 +9,11 @@
 企画・進行状況の詳細はこちら（Figma）  
 https://www.figma.com/design/j3bv24B1nA4ZLdHVV0eTGf/%E6%96%B0%E3%81%97%E3%81%84%E3%83%9E%E3%83%83%E3%83%97%E3%83%97%E3%83%AD%E3%82%B8%E3%82%A7%E3%82%AF%E3%83%88?m=auto&t=AMECaFxSelJ3qRld-6
 
+## 開発中デモ
+URL:https://portfolio-q3l8v5m1x6kp.vercel.app/
+
+## 更新履歴
+| 日付 | 内容 |
+|------|------|
+| 2025-11-21 | プロトタイプ作成完了 |
+| 2025-11-23 | プロトタイプ改修の企画（Figma） |
