@@ -51,7 +51,7 @@
 <script setup>
 
 import { MAPBOX_ACCESS_TOKEN } from '@/constants/index';
-import { ref, shallowRef, onMounted, onBeforeUnmount, watch, nextTick } from 'vue';
+import { ref, shallowRef, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue';
 import { useRouter, useRoute } from 'vue-router';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
@@ -63,11 +63,11 @@ import ClusterComponent from '@/components/Cluster.vue';
 import DialogComponents from '@/components/Dialog.vue';
 import ButtonComponents from '@/components/Button.vue';
 
-const router = useRouter();
-const route = useRoute();
-
 import spotsData from '@/assets/data/spots.json';
 import noimage from '@/assets/images/dummy.jpg';
+
+const router = useRouter();
+const route = useRoute();
 
 const appMap = shallowRef(null);
 const appMarkers = ref([]);
@@ -78,6 +78,7 @@ const appMarkerUpdaing = ref(false);
 
 const appContentList = ref(null);
 const appArticle = ref(null);
+const appArticleLast = ref(null);
 const appCluster = ref(null);
 const appDialogVisible = ref(false);
 
@@ -93,12 +94,11 @@ const appCategoryData = ref([
   { id: 6, name: '体験' },
   { id: 7, name: '交通' },
 ]);
-
-
+const appCategoryUpdating = ref(false);
 
 onMounted(() => {
 
-  // コンテンツデータの取得
+  // データの取得
   appContentList.value = spotsData;
 
   // GeoJSONに変換
@@ -166,7 +166,7 @@ const convertGeojson = (data) => {
 
 
 /**
- * マーカー描画の更新
+ * マーカーの表示処理
  */
 const updateMarker = async() => {
 
@@ -175,41 +175,118 @@ const updateMarker = async() => {
 
   appMarkerUpdateFrame = requestAnimationFrame(async() => {
     appMarkerUpdaing.value = true;
-    
+
     try {
       if (!appMap.value.getLayer('marker')) return;
-      
-      const features = appMap.value.queryRenderedFeatures({ layers: ['marker'] });
+
+      const features = appMap.value.querySourceFeatures('marker');
       const newMarkers = {};
 
       for (const { geometry, properties: props } of features) {
-        const id = props.cluster ? `CL${props.cluster_id}` : props.id;
+        const id = props.cluster ? `c${props.cluster_id}` : props.id;
+        let marker = appMarkersOnScreen.value[id];
+
+        // マーカー新規作成
+        if (!marker) {
+          const markerData = props.cluster ? await getClusterMarkerData(props.cluster_id) : [props];
+          const clusterCount = props.cluster ? props.point_count : 0;
+
+          // マップにマーカー追加
+          marker = appMarkersOnScreen.value[id] = new mapboxgl.Marker({
+            element: createMarkerElement(markerData[0], clusterCount),
+            anchor: 'bottom'
+          }).setLngLat([markerData[0].longitude, markerData[0].latitude]);
+          marker.addTo(appMap.value);
+
+          // クリックイベント追加
+          marker.clickHandler = () => {
+            showArticle(markerData[0]);
+            appCluster.value = props.cluster ? markerData : null;
+          };
+          marker.keyHandler = (e) => {
+            if (e.key === 'Enter' || e.key === ' ') {
+              e.preventDefault();
+              marker.clickHandler();
+            }
+          };
+          marker.getElement().addEventListener('click', marker.clickHandler);
+          marker.getElement().addEventListener('keydown', marker.keyHandler);
+        }
+
+        newMarkers[id] = marker;
+      }
+
+      // 画面外のマーカーを削除
+      Object.keys(appMarkersOnScreen.value).forEach(id => {
+        if (!newMarkers[id]) {
+          const marker = appMarkersOnScreen.value[id];
+          if (marker.clickHandler) {
+            marker.getElement().removeEventListener('click', marker.clickHandler);
+            delete marker.clickHandler;
+          }
+          if (marker.keyHandler) {
+            marker.getElement().removeEventListener('keydown', marker.keyHandler);
+            delete marker.keyHandler;
+          }
+          marker.remove();
+        }
+      });
+
+      appMarkersOnScreen.value = newMarkers;
+    } catch (error) {
+      console.error(error);
+    } finally {
+      appMarkerUpdaing.value = false;
+    }
+  });
+}
+
+
+/**
+ * マーカーの表示処理（一度生成したマーカーを再利用する場合）
+ * ※将来的に使う可能性もあるので保存
+ */
+const updateMarkerSave = async() => {
+
+  if (appMarkerUpdaing.value) return;
+  if (appMarkerUpdateFrame) cancelAnimationFrame(appMarkerUpdateFrame);
+
+  appMarkerUpdateFrame = requestAnimationFrame(async() => {
+    appMarkerUpdaing.value = true;
+
+    try {
+      if (!appMap.value.getLayer('marker')) return;
+
+      const features = appMap.value.querySourceFeatures('marker');
+      const newMarkers = {};
+
+      for (const { geometry, properties: props } of features) {
+        const id = props.cluster ? `c${props.cluster_id}` : props.id;
         let marker = appMarkers.value[id];
 
+        // マーカー新規作成
         if (!marker) {
-          const isCluster = props.cluster;
-          const markerData = isCluster ? await getClusterMarkerData(props.cluster_id) : props;
-          const data = isCluster ? markerData[0] : markerData;
-          const count = isCluster ? props.point_count : 0;
-
-          if (!data) continue;
+          const markerData = props.cluster ? await getClusterMarkerData(props.cluster_id) : [props];
+          const clusterCount = props.cluster ? props.point_count : 0;
 
           marker = appMarkers.value[id] = new mapboxgl.Marker({
-            element: createMarkerElement(data, count),
+            element: createMarkerElement(markerData[0], clusterCount),
             anchor: 'bottom'
-          }).setLngLat([data.longitude, data.latitude]);
+          }).setLngLat([markerData[0].longitude, markerData[0].latitude]);
         }
 
         newMarkers[id] = marker;
 
+        // 画面内にマーカーを追加
         if (!appMarkersOnScreen.value[id]) {
           marker.addTo(appMap.value);
+
+          // クリックイベントを追加
           if (!marker.clickHandler) {
-            const isCluster = props.cluster;
-            const markerData = isCluster ? await getClusterMarkerData(props.cluster_id) : props;
+            const markerData = props.cluster ? await getClusterMarkerData(props.cluster_id) : [props];
             marker.clickHandler = () => {
-              isCluster ? showArticle(markerData[0]) : showArticle(markerData);
-              appCluster.value = isCluster ? markerData : null;
+              showArticle(markerData[0]);
+              appCluster.value = props.cluster ? markerData : null;
             };
             marker.keyHandler = (e) => {
               if (e.key === 'Enter' || e.key === ' ') {
@@ -223,6 +300,7 @@ const updateMarker = async() => {
         }
       }
 
+      // 画面外のマーカーを削除
       Object.keys(appMarkersOnScreen.value).forEach(id => {
         if (!newMarkers[id]) appMarkersOnScreen.value[id].remove();
       });
@@ -234,6 +312,35 @@ const updateMarker = async() => {
       appMarkerUpdaing.value = false;
     }
   });
+}
+
+
+/**
+ * マーカーのクリーンアップ処理
+ */
+const removeMarker = () => {
+
+  if (appMarkerUpdateFrame) {
+    cancelAnimationFrame(appMarkerUpdateFrame);
+    appMarkerUpdateFrame = null;
+  }
+
+  for (const key in appMarkersOnScreen.value) {
+    const marker = appMarkersOnScreen.value[key];
+    if (marker.clickHandler) {
+      marker.getElement().removeEventListener('click', marker.clickHandler);
+      delete marker.clickHandler;
+    }
+    if (marker.keyHandler) {
+      marker.getElement().removeEventListener('keydown', marker.keyHandler);
+      delete marker.keyHandler;
+    }
+    marker.remove();
+  }
+
+  appMarkersOnScreen.value = {};
+
+  appMarkerUpdaing.value = false;
 }
 
 
@@ -264,6 +371,17 @@ const getClusterMarkerData = async(id) => {
   return new Promise((resolve) => {
     appMap.value.getSource('marker').getClusterLeaves(id, 99, 0, (err, d) => {
       let newArray = d ? d.map(item => item.properties) : [];
+
+      // appArticleLast.valueのidと一致するアイテムを先頭に移動
+      if (appArticleLast.value?.id) {
+        const index = newArray.findIndex(item => item.id === appArticleLast.value.id);
+        if (index > 0) {
+          const [matchedItem] = newArray.splice(index, 1);
+          newArray.unshift(matchedItem);
+        }
+      }
+      
+
       resolve(newArray);
     });
   });
@@ -281,6 +399,10 @@ const createMarkerElement = (data, count = 0) => {
 
   if(count > 0){
     clusterElement = `<span class="marker__cluster">${count}</span>`;
+  }
+
+  if(appArticleLast.value?.id === data.id){
+    appendClass = ' is-selected';
   }
 
   element.id = `marker-${data.id}`;
@@ -309,28 +431,28 @@ const createMarkerElement = (data, count = 0) => {
  */
 const updateCategory = (id) => {
 
+  if(appCategoryUpdating.value) return;
+  appCategoryUpdating.value = true;
   appSelectedCategory.value = id;
 
-  // 一覧データをフィルター(カンマ区切りのcategoryにも対応)
+　// 既存マーカーを削除
+  removeMarker();
+
+  // 一覧データを更新
   appContentList.value = id === 0 ? spotsData : spotsData.filter(spot => {
     const categories = spot.category.toString().split(',').map(c => c.trim());
     return categories.includes(id.toString());
   });
 
-  // マップデータをフィルター(数値を文字列に変換)
+  // マップのソースデータを更新
   const geojson = convertGeojson(appContentList.value);
   appMap.value.getSource('marker').setData(geojson);
-  
 
-  // 既存のマーカーを全て削除
-  for (const key in appMarkersOnScreen.value) {
-    appMarkersOnScreen.value[key].remove();
-  }
-  appMarkersOnScreen.value = {};
-  appMarkers.value = {};
-
-  updateMarker();
-  updateMarkerZindex();
+  appMap.value.once('idle', () => {
+    updateMarker();
+    updateMarkerZindex();
+    appCategoryUpdating.value = false;
+  });
 
 }
 
@@ -339,33 +461,31 @@ const updateCategory = (id) => {
  * 記事の表示処理
  */
 const showArticle = (articleData, updateZoom = false) => {
-  appArticle.value = articleData;
+  appArticleLast.value = appArticle.value = articleData;
 
   nextTick(() => {
     setTimeout(() => {
+
       appMap.value.resize();
-      requestAnimationFrame(() => {
 
-        // 中心座標をマーカー座標に更新
-        const currentZoom = appMap.value.getZoom();
-        const activeZoom = updateZoom && currentZoom < 12 ? 12 : currentZoom;
-        const targetCenter = appCluster.value ? [appCluster.value[0].longitude, appCluster.value[0].latitude] : [appArticle.value.longitude, appArticle.value.latitude];
-        appMap.value.easeTo({
-          center: targetCenter,
-          zoom: activeZoom,
-          padding: 20,
-          duration: 500
-        });
-
-        // easeToのアニメーション完了後にマーカーの選択状態を更新
-        setTimeout(() => {
-          const targetId = appCluster.value ? appCluster.value[0].id : appArticle.value.id;
-          document.querySelectorAll('.marker.is-selected').forEach(el => el.classList.remove('is-selected'));
-          document.getElementById(`marker-${targetId}`)?.classList.add('is-selected');
-        }, 550);
-
+      // 中心座標をマーカー座標に更新
+      const currentZoom = appMap.value.getZoom();
+      const zoom = updateZoom && currentZoom < 12 ? 12 : currentZoom;
+      const center = appCluster.value?.length ? [appCluster.value[0].longitude, appCluster.value[0].latitude] : [appArticle.value.longitude, appArticle.value.latitude];
+      appMap.value.easeTo({
+        center: center,
+        zoom: zoom,
+        duration: 500
       });
-    }, 300);
+
+      // easeToのアニメーション完了後にマーカーの選択状態を更新
+      setTimeout(() => {
+        const targetId = appCluster.value ? appCluster.value[0].id : appArticle.value.id;
+        document.querySelectorAll('.marker.is-selected').forEach(el => el.classList.remove('is-selected'));
+        document.getElementById(`marker-${targetId}`)?.classList.add('is-selected');
+      }, 500);
+
+    }, 500);
   });
 }
 
@@ -674,13 +794,13 @@ const closeArticle = () => {
     text-overflow: ellipsis;
     white-space: nowrap;
     text-shadow:
-      0px -1px 0 rgba(255 255 255 / 50%),
-      1px -1px 0 rgba(255 255 255 / 50%),
+      0 1px 0 rgba(255 255 255 / 50%),
+      0 -1px 0 rgba(255 255 255 / 50%),
       1px 0 0 rgba(255 255 255 / 50%),
       1px 1px 0 rgba(255 255 255 / 50%),
-      0 1px 0 rgba(255 255 255 / 50%),
-      -1px 1px 0 rgba(255 255 255 / 50%),
+      1px -1px 0 rgba(255 255 255 / 50%),
       -1px 0 0 rgba(255 255 255 / 50%),
+      -1px 1px 0 rgba(255 255 255 / 50%),
       -1px -1px 0 rgba(255 255 255 / 50%);
   }
   &__cluster{
@@ -714,7 +834,7 @@ const closeArticle = () => {
       animation: markerSelectedAnimation 2s ease-in-out infinite;
     }
     #{$this}__name{
-      font-size: 12px;
+      font-size: 13px;
       color: var(--color-primary);
     }
   }
