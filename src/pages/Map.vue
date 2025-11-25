@@ -9,6 +9,11 @@
     <div class="map__container2">
       <div class="canvas">
         <div id="canvas" class="canvas__body"></div>
+          <Transition name="fade-list" mode="out-in">
+            <div class="canvas__loading" v-if="appMapLoading">
+              <LoaderComponents />
+            </div>
+          </Transition>
       </div>
     </div>
     <div class="map__container3">
@@ -19,8 +24,8 @@
           </div>
           <div class="navigation__container2">
             <Transition name="fade-list" mode="out-in">
-              <ul v-if="appContentList && appContentList.length > 0" :key="appSelectedCategory" class="content-list" role="list">
-                <li class="content-list__item" v-for="item in appContentList" :key="item.id" role="listitem">
+              <ul v-if="appLocationsOnScreen && appLocationsOnScreen.length > 0" :key="appSelectedCategory" class="content-list" role="list">
+                <li class="content-list__item" v-for="item in appLocationsOnScreen" :key="item.id" role="listitem">
                   <CardComponent :data="item" @show-article="showArticle($event, true)" />
                 </li>
               </ul>
@@ -52,31 +57,39 @@
 
 import { MAPBOX_ACCESS_TOKEN } from '@/constants/index';
 import { ref, shallowRef, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue';
+import axios from 'axios';
 import { useRouter, useRoute } from 'vue-router';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
+import ButtonComponents from '@/components/Button.vue';
 import CardComponent from '@/components/Card.vue';
 import ArticleComponent from '@/components/Article.vue';
 import CategoryComponent from '@/components/Category.vue';
 import ClusterComponent from '@/components/Cluster.vue';
 import DialogComponents from '@/components/Dialog.vue';
-import ButtonComponents from '@/components/Button.vue';
+import LoaderComponents from '@/components/Loader.vue';
 
-import spotsData from '@/assets/data/spots.json';
 import noimage from '@/assets/images/dummy.jpg';
 
 const router = useRouter();
 const route = useRoute();
 
+const appLocations = ref(null);
+const appLocationsOnScreen = ref(null);
+const appJapanGeojson = ref(null);
+const appKawanishiGeojson = ref(null);
+
 const appMap = shallowRef(null);
+const appMapLoading = ref(true);
+const appMapInitialized = ref(false);
+
 const appMarkers = ref([]);
 const appMarkersOnScreen = ref([]);
 
 let appMarkerUpdateFrame = null;
 const appMarkerUpdaing = ref(false);
 
-const appContentList = ref(null);
 const appArticle = ref(null);
 const appArticleLast = ref(null);
 const appCluster = ref(null);
@@ -96,27 +109,100 @@ const appCategoryData = ref([
 ]);
 const appCategoryUpdating = ref(false);
 
-onMounted(() => {
+onMounted( async () => {
 
-  // データの取得
-  appContentList.value = spotsData;
+  // データ取得
+  const [locationsRaw, japanGeojsonRaw, kawanishiGeojsonRaw] = await Promise.all([
+    axios.get('/assets/data/locations.json'),
+    axios.get('/assets/data/japan.geojson'),
+    axios.get('/assets/data/kawanishi.geojson')
+  ]);
+  appLocationsOnScreen.value = appLocations.value = locationsRaw.data;
+  appJapanGeojson.value = japanGeojsonRaw.data;
+  appKawanishiGeojson.value = kawanishiGeojsonRaw.data;
 
-  // GeoJSONに変換
-  const geojson = convertGeojson(spotsData);
-
-  // マップボックス初回生成
+  // マップ生成
   mapboxgl.accessToken = MAPBOX_ACCESS_TOKEN;
   appMap.value = new mapboxgl.Map({
     container: 'canvas',
     style: 'mapbox://styles/keiteimaru/cmi5hrq7i00rz01su74zu28qs',
-    center: [135.41853216103894, 34.88712146525946],
-    zoom: window.innerWidth <= 1024 ? 11 : 12,
+    center: [136.8118770963574, 37.068635228535285],
+    //zoom: window.innerWidth <= 1024 ? 11 : 12,
+    zoom: window.innerWidth <= 1024 ? 3.5 : 4.5,
     language: 'ja',
     attributionControl: false,
   });
 
-  appMap.value .on('load', () => {
-    appMap.value.resize();
+  // マップ初回読み込み完了後
+  appMap.value.on('load', () => {
+    //appMap.value.resize();
+
+    // Standard styleのベースレイヤーを非表示
+    appMap.value.setConfigProperty('basemap', 'showPlaceLabels', false);
+    appMap.value.setConfigProperty('basemap', 'showRoadLabels', false);
+    appMap.value.setConfigProperty('basemap', 'showPointOfInterestLabels', false);
+    appMap.value.setConfigProperty('basemap', 'showTransitLabels', false);
+
+    // 背景
+    appMap.value.addLayer({
+      id: 'world-fill',
+      type: 'background',
+      paint: {
+        'background-color': '#f0ecf4'
+      }
+    });
+
+    // 日本
+    appMap.value.addSource('japan', {
+      type: 'geojson',
+      data: appJapanGeojson.value
+    });
+    appMap.value.addLayer({
+      id: 'japan-fill',
+      type: 'fill',
+      source: 'japan',
+      paint: {
+        'fill-color': '#fcf8ff',
+        'fill-opacity': 1
+      }
+    });
+    appMap.value.addLayer({
+      id: 'japan-outline',
+      type: 'line',
+      source: 'japan',
+      paint: {
+        'line-color': '#5b5891',
+        'line-width': 1
+      }
+    });
+
+    // 川西
+    appMap.value.addSource('kawanishi', {
+      type: 'geojson',
+      data: appKawanishiGeojson.value
+    });
+    appMap.value.addLayer({
+      id: 'kawanishi-fill',
+      type: 'fill',
+      source: 'kawanishi',
+      paint: {
+        'fill-color': '#5b5891',
+        'fill-opacity': 0.8
+      }
+    });
+    appMap.value.addLayer({
+      id: 'kawanishi-outline',
+      type: 'line',
+      source: 'kawanishi',
+      paint: {
+      'line-color': '#5b5891',
+      'line-width': 1,
+      'line-dasharray': [2, 2]
+      }
+    });
+
+    // マーカー生成
+    const geojson = convertGeojson(appLocations.value);
     appMap.value.addSource('marker', {
       type: 'geojson',
       data: geojson,
@@ -132,9 +218,71 @@ onMounted(() => {
         'circle-radius': 4
       }
     });
+
+    appMap.value.once('idle', () => {
+
+      /** 初回アニメーション処理 */
+      appMapLoading.value = false;
+
+      setTimeout(() => {
+        appMap.value.easeTo({
+          center: [135.41086378066638, 34.87225650562146],
+          zoom: window.innerWidth <= 1024 ? 10.5 : 11.5,
+          duration: 3000,
+          curve: 3
+        });
+
+        setTimeout(() => {
+          const layerIds = ['world-fill', 'japan-fill', 'japan-outline', 'kawanishi-fill'];
+          const duration = 800;
+          const steps = 50;
+          const interval = duration / steps;
+
+          let currentStep = 0;
+          const fadeInterval = setInterval(() => {
+            currentStep++;
+            const opacity = 1 - (currentStep / steps);
+            
+            layerIds.forEach(layerId => {
+              const layer = appMap.value.getLayer(layerId);
+              if (layer) {
+                const paintProperty = layer.type === 'background' || layer.type === 'fill' 
+                  ? 'fill-opacity' 
+                  : 'line-opacity';
+                
+                if (layer.type === 'background') {
+                  appMap.value.setPaintProperty(layerId, 'background-opacity', opacity);
+                } else {
+                  appMap.value.setPaintProperty(layerId, paintProperty, opacity);
+                }
+              }
+            });
+            if (currentStep >= steps) {
+              clearInterval(fadeInterval);
+              layerIds.forEach(layerId => {
+                appMap.value.setLayoutProperty(layerId, 'visibility', 'none');
+              });
+            }
+          }, interval);
+
+          setTimeout(() => {
+            appMap.value.setConfigProperty('basemap', 'showPlaceLabels', true);
+            appMap.value.setConfigProperty('basemap', 'showRoadLabels', true);
+            appMap.value.setConfigProperty('basemap', 'showTransitLabels', true);
+            updateMarker(true);
+            setTimeout(() => {
+              updateMarkerZindex();
+              appMapInitialized.value = true;
+            }, 100);
+          }, 200);
+        }, 4000);
+      }, 1000);
+
+    });
   });
 
   appMap.value.on('render', ()=> {
+    if (!appMapInitialized.value) return;
     updateMarker();
     updateMarkerZindex();
   });
@@ -168,7 +316,7 @@ const convertGeojson = (data) => {
 /**
  * マーカーの表示処理
  */
-const updateMarker = async() => {
+const updateMarker = async(animate = false) => {
 
   if (appMarkerUpdaing.value) return;
   if (appMarkerUpdateFrame) cancelAnimationFrame(appMarkerUpdateFrame);
@@ -193,7 +341,7 @@ const updateMarker = async() => {
 
           // マップにマーカー追加
           marker = appMarkersOnScreen.value[id] = new mapboxgl.Marker({
-            element: createMarkerElement(markerData[0], clusterCount),
+            element: createMarkerElement(markerData[0], clusterCount, animate),
             anchor: 'bottom'
           }).setLngLat([markerData[0].longitude, markerData[0].latitude]);
           marker.addTo(appMap.value);
@@ -391,7 +539,7 @@ const getClusterMarkerData = async(id) => {
 /**
  * マーカーのDOM要素を作成
  */
-const createMarkerElement = (data, count = 0) => {
+const createMarkerElement = (data, count = 0, animate = false) => {
 
   const element = document.createElement('div');
   let appendClass = '';
@@ -403,6 +551,10 @@ const createMarkerElement = (data, count = 0) => {
 
   if(appArticleLast.value?.id === data.id){
     appendClass = ' is-selected';
+  }
+
+  if(animate){
+    appendClass += ' is-animating';
   }
 
   element.id = `marker-${data.id}`;
@@ -422,6 +574,12 @@ const createMarkerElement = (data, count = 0) => {
     <div class="marker__name" aria-hidden="true">${data.name}</div>
   `);
 
+  if(animate){
+    setTimeout(() => {
+      element.classList.remove('is-animating');
+    }, 600);
+  }
+
   return element;
 }
 
@@ -439,19 +597,21 @@ const updateCategory = (id) => {
   removeMarker();
 
   // 一覧データを更新
-  appContentList.value = id === 0 ? spotsData : spotsData.filter(spot => {
+  appLocationsOnScreen.value = id === 0 ? appLocations.value : appLocations.value.filter(spot => {
     const categories = spot.category.toString().split(',').map(c => c.trim());
     return categories.includes(id.toString());
   });
 
   // マップのソースデータを更新
-  const geojson = convertGeojson(appContentList.value);
+  const geojson = convertGeojson(appLocationsOnScreen.value);
   appMap.value.getSource('marker').setData(geojson);
 
   appMap.value.once('idle', () => {
-    updateMarker();
-    updateMarkerZindex();
-    appCategoryUpdating.value = false;
+    updateMarker(true);
+    setTimeout(() => {
+      updateMarkerZindex();
+      appCategoryUpdating.value = false;
+    }, 100);
   });
 
 }
@@ -574,9 +734,22 @@ const closeArticle = () => {
   border-radius: 12px;
   width: 100%;
   height: 100%;
+  background-color: var(--color-surface-container);
   &__body{
     width: 100%;
     height: 100%;
+  }
+  &__loading{
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 100;
+    position: absolute;
+    inset: 0;
+    border-radius: 12px;
+    background-color: var(--color-surface-container);
+    font-size: 13px;
+    color: var(--color-on-primary-container);
   }
   @include mixin.mq(md){
     border-radius: 20px;
@@ -837,6 +1010,38 @@ const closeArticle = () => {
       font-size: 13px;
       color: var(--color-primary);
     }
+  }
+
+  &.is-animating{
+    #{$this}__container{
+      transform-origin: bottom;
+      animation: markerShowAnimation 0.2s ease-out;
+    }
+    #{$this}__shadow{
+      animation: markerShowAnimation2 0.2s ease-out;
+    }
+    #{$this}__name{
+      animation: markerShowAnimation2 0.2s ease-out;
+    }
+  }
+}
+
+@keyframes markerShowAnimation {
+  0% {
+    opacity: 0;
+    transform: scale(0);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes markerShowAnimation2 {
+  0% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
   }
 }
 
