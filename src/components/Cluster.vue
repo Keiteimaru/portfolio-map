@@ -11,7 +11,16 @@
       }"
     >
       <swiper-slide class="cluster-list__item" v-for="item in data" :key="item.id">
-        <div class="cluster-card" :class="{ 'is-selected': item.id === article.id }" @click="$emit('showArticle', item)">
+        <div 
+          class="cluster-card" 
+          role="button"
+          :class="{ 'is-selected': item.id === article.id }"
+          :tabindex="item.id === article.id ? -1 : 0"
+          :aria-label="`${item.name}を選択`"
+          @click="$emit('showArticle', item)"
+          @keydown.enter="$emit('showArticle', item)"
+          @keydown.space.prevent="$emit('showArticle', item)"
+        >
           <div class="cluster-card__image">
             <img :src="item.image || noimage" alt="">
             <span v-if="article.id === item.id" class="material-symbols-rounded">check</span>
@@ -73,6 +82,7 @@ const emits = defineEmits([
   gap: 4px 0;
   overflow: hidden;
   position: relative;
+  cursor: pointer;
   &__image{
     position: relative;
     border: solid 3px var(--color-surface);

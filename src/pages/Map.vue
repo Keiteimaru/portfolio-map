@@ -29,10 +29,10 @@
                   <CardComponent :data="item" @show-article="showArticle($event, true)" />
                 </li>
               </ul>
-              <div v-else class="content-list-empty">
+                <div v-else-if="!appMapLoading" class="content-list-empty">
                 ごめんなさい！<br>
                 絶賛、情報収集中です。
-              </div>
+                </div>
             </Transition>
           </div>
         </nav>
