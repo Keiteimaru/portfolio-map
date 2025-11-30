@@ -53,7 +53,7 @@
   <DialogComponents v-if="appDialogVisible" @close="appDialogVisible = false" />
 </template>
 
-<script setup>
+<script setup lang="ts">
 
 import { MAPBOX_ACCESS_TOKEN } from '@/constants/index';
 import { ref, shallowRef, computed, onMounted, onBeforeUnmount, watch, nextTick } from 'vue';
@@ -72,31 +72,65 @@ import LoaderComponents from '@/components/Loader.vue';
 
 import noimage from '@/assets/images/dummy.jpg';
 
+import type { Ref, ShallowRef } from 'vue';
+import type { Map, Marker, GeoJSONSource } from 'mapbox-gl';
+import type { AxiosResponse } from 'axios';
+
+interface Location {
+  id: number;
+  name: string;
+  label: string;
+  category: string;
+  description: string;
+  longitude: number;
+  latitude: number;
+  image?: string;
+  nearest_station?: string;
+  distance_from_station?: string;
+  opening_hours?: string;
+  addres?: string;
+  phone_number?: string;
+  website?: string;
+}
+interface Category {
+  id: number;
+  name: string;
+}
+interface ClusterProperties {
+  cluster: boolean;
+  cluster_id: number;
+  point_count: number;
+}
+interface MarkerWithHandlers extends Marker {
+  clickHandler?: () => void;
+  keyHandler?: (e: KeyboardEvent) => void;
+}
+
 const router = useRouter();
 const route = useRoute();
 
-const appLocations = ref(null);
-const appLocationsOnScreen = ref(null);
-const appJapanGeojson = ref(null);
-const appKawanishiGeojson = ref(null);
+const appLocations = ref<Location[] | null>(null);
+const appLocationsOnScreen = ref<Location[] | null>(null);
+const appJapanGeojson = ref<any>(null);
+const appKawanishiGeojson = ref<any>(null);
 
-const appMap = shallowRef(null);
-const appMapLoading = ref(true);
-const appMapInitialized = ref(false);
+const appMap = shallowRef<Map | null>(null);
+const appMapLoading = ref<boolean>(true);
+const appMapInitialized = ref<boolean>(false);
 
-const appMarkers = ref([]);
-const appMarkersOnScreen = ref([]);
+const appMarkers = ref<Record<string, MarkerWithHandlers>>({});
+const appMarkersOnScreen = ref<Record<string, MarkerWithHandlers>>({});
 
-let appMarkerUpdateFrame = null;
-const appMarkerUpdaing = ref(false);
+let appMarkerUpdateFrame: number | null = null;
+const appMarkerUpdaing = ref<boolean>(false);
 
-const appArticle = ref(null);
-const appArticleLast = ref(null);
-const appCluster = ref(null);
-const appDialogVisible = ref(false);
+const appArticle = ref<Location | null>(null);
+const appArticleLast = ref<Location | null>(null);
+const appCluster = ref<Location[] | null>(null);
+const appDialogVisible = ref<boolean>(false);
 
-const appSelectedCategory = ref(0);
-const appCategoryData = ref([
+const appSelectedCategory = ref<number>(0);
+const appCategoryData = ref<Category[]>([
   { id: 0, name: 'すべて' },
   { id: 100, name: '紅葉' },
   { id: 1, name: '観光名所' },
@@ -107,7 +141,7 @@ const appCategoryData = ref([
   { id: 6, name: '体験' },
   { id: 7, name: '交通' },
 ]);
-const appCategoryUpdating = ref(false);
+const appCategoryUpdating = ref<boolean>(false);
 
 onMounted( async () => {
 
@@ -134,17 +168,16 @@ onMounted( async () => {
   });
 
   // マップ初回読み込み完了後
-  appMap.value.on('load', () => {
-    //appMap.value.resize();
+  appMap.value!.on('load', () => {
 
     // Standard styleのベースレイヤーを非表示
-    appMap.value.setConfigProperty('basemap', 'showPlaceLabels', false);
-    appMap.value.setConfigProperty('basemap', 'showRoadLabels', false);
-    appMap.value.setConfigProperty('basemap', 'showPointOfInterestLabels', false);
-    appMap.value.setConfigProperty('basemap', 'showTransitLabels', false);
+    appMap.value!.setConfigProperty('basemap', 'showPlaceLabels', false);
+    appMap.value!.setConfigProperty('basemap', 'showRoadLabels', false);
+    appMap.value!.setConfigProperty('basemap', 'showPointOfInterestLabels', false);
+    appMap.value!.setConfigProperty('basemap', 'showTransitLabels', false);
 
     // 背景
-    appMap.value.addLayer({
+    appMap.value!.addLayer({
       id: 'world-fill',
       type: 'background',
       paint: {
@@ -153,11 +186,11 @@ onMounted( async () => {
     });
 
     // 日本
-    appMap.value.addSource('japan', {
+    appMap.value!.addSource('japan', {
       type: 'geojson',
       data: appJapanGeojson.value
     });
-    appMap.value.addLayer({
+    appMap.value!.addLayer({
       id: 'japan-fill',
       type: 'fill',
       source: 'japan',
@@ -166,7 +199,7 @@ onMounted( async () => {
         'fill-opacity': 1
       }
     });
-    appMap.value.addLayer({
+    appMap.value!.addLayer({
       id: 'japan-outline',
       type: 'line',
       source: 'japan',
@@ -177,11 +210,11 @@ onMounted( async () => {
     });
 
     // 川西
-    appMap.value.addSource('kawanishi', {
+    appMap.value!.addSource('kawanishi', {
       type: 'geojson',
       data: appKawanishiGeojson.value
     });
-    appMap.value.addLayer({
+    appMap.value!.addLayer({
       id: 'kawanishi-fill',
       type: 'fill',
       source: 'kawanishi',
@@ -190,7 +223,7 @@ onMounted( async () => {
         'fill-opacity': 0.8
       }
     });
-    appMap.value.addLayer({
+    appMap.value!.addLayer({
       id: 'kawanishi-outline',
       type: 'line',
       source: 'kawanishi',
@@ -201,31 +234,33 @@ onMounted( async () => {
       }
     });
 
-    // マーカー生成
-    const geojson = convertGeojson(appLocations.value);
-    appMap.value.addSource('marker', {
-      type: 'geojson',
-      data: geojson,
-      cluster: true,
-      clusterRadius: 55
-    });
-    appMap.value.addLayer({
-      'id': 'marker',
-      'type': 'circle',
-      'source': 'marker',
-      'paint': {
-        'circle-opacity': 0,
-        'circle-radius': 4
-      }
-    });
+    if(appLocations.value) {
+      // マーカー生成
+      const geojson = convertGeojson(appLocations.value);
+      appMap.value!.addSource('marker', {
+        type: 'geojson',
+        data: geojson,
+        cluster: true,
+        clusterRadius: 55
+      });
+      appMap.value!.addLayer({
+        'id': 'marker',
+        'type': 'circle',
+        'source': 'marker',
+        'paint': {
+          'circle-opacity': 0,
+          'circle-radius': 4
+        }
+      });
+    }
 
-    appMap.value.once('idle', () => {
+    appMap.value!.once('idle', () => {
 
       /** 初回アニメーション処理 */
       appMapLoading.value = false;
 
       setTimeout(() => {
-        appMap.value.easeTo({
+        appMap.value!.easeTo({
           center: [135.41086378066638, 34.87225650562146],
           zoom: window.innerWidth <= 1024 ? 10.5 : 11.5,
           duration: 3000,
@@ -244,31 +279,31 @@ onMounted( async () => {
             const opacity = 1 - (currentStep / steps);
             
             layerIds.forEach(layerId => {
-              const layer = appMap.value.getLayer(layerId);
+              const layer = appMap.value!.getLayer(layerId);
               if (layer) {
                 const paintProperty = layer.type === 'background' || layer.type === 'fill' 
                   ? 'fill-opacity' 
                   : 'line-opacity';
                 
                 if (layer.type === 'background') {
-                  appMap.value.setPaintProperty(layerId, 'background-opacity', opacity);
+                  appMap.value!.setPaintProperty(layerId, 'background-opacity', opacity);
                 } else {
-                  appMap.value.setPaintProperty(layerId, paintProperty, opacity);
+                  appMap.value!.setPaintProperty(layerId, paintProperty, opacity);
                 }
               }
             });
             if (currentStep >= steps) {
               clearInterval(fadeInterval);
               layerIds.forEach(layerId => {
-                appMap.value.setLayoutProperty(layerId, 'visibility', 'none');
+                appMap.value!.setLayoutProperty(layerId, 'visibility', 'none');
               });
             }
           }, interval);
 
           setTimeout(() => {
-            appMap.value.setConfigProperty('basemap', 'showPlaceLabels', true);
-            appMap.value.setConfigProperty('basemap', 'showRoadLabels', true);
-            appMap.value.setConfigProperty('basemap', 'showTransitLabels', true);
+            appMap.value!.setConfigProperty('basemap', 'showPlaceLabels', true);
+            appMap.value!.setConfigProperty('basemap', 'showRoadLabels', true);
+            appMap.value!.setConfigProperty('basemap', 'showTransitLabels', true);
             updateMarker(true);
             setTimeout(() => {
               updateMarkerZindex();
@@ -281,7 +316,7 @@ onMounted( async () => {
     });
   });
 
-  appMap.value.on('render', ()=> {
+  appMap.value!.on('render', ()=> {
     if (!appMapInitialized.value) return;
     updateMarker();
     updateMarkerZindex();
@@ -293,7 +328,7 @@ onMounted( async () => {
 /**
  * オブジェクト配列をGeoJSON形式に変換
  */
-const convertGeojson = (data) => {
+const convertGeojson = (data: Location[]): GeoJSON.FeatureCollection => {
   const geojson = {
     type: 'FeatureCollection',
     features: []
@@ -325,9 +360,9 @@ const updateMarker = async(animate = false) => {
     appMarkerUpdaing.value = true;
 
     try {
-      if (!appMap.value.getLayer('marker')) return;
+      if (!appMap.value!.getLayer('marker')) return;
 
-      const features = appMap.value.querySourceFeatures('marker');
+      const features = appMap.value!.querySourceFeatures('marker');
       const newMarkers = {};
 
       for (const { geometry, properties: props } of features) {
@@ -403,9 +438,9 @@ const updateMarkerSave = async() => {
     appMarkerUpdaing.value = true;
 
     try {
-      if (!appMap.value.getLayer('marker')) return;
+      if (!appMap.value!.getLayer('marker')) return;
 
-      const features = appMap.value.querySourceFeatures('marker');
+      const features = appMap.value!.querySourceFeatures('marker');
       const newMarkers = {};
 
       for (const { geometry, properties: props } of features) {
@@ -515,9 +550,9 @@ const updateMarkerZindex = () => {
 /**
  * クラスターマーカーのデータ取得
  */
-const getClusterMarkerData = async(id) => {
+const getClusterMarkerData = async (id: number): Promise<Location[]> => {
   return new Promise((resolve) => {
-    appMap.value.getSource('marker').getClusterLeaves(id, 99, 0, (err, d) => {
+    appMap.value!.getSource('marker').getClusterLeaves(id, 99, 0, (err, d) => {
       let newArray = d ? d.map(item => item.properties) : [];
 
       // appArticleLast.valueのidと一致するアイテムを先頭に移動
@@ -539,8 +574,7 @@ const getClusterMarkerData = async(id) => {
 /**
  * マーカーのDOM要素を作成
  */
-const createMarkerElement = (data, count = 0, animate = false) => {
-
+const createMarkerElement = ( data: Location, count: number = 0, animate: boolean = false): HTMLDivElement => {
   const element = document.createElement('div');
   let appendClass = '';
   let clusterElement = '';
@@ -587,7 +621,7 @@ const createMarkerElement = (data, count = 0, animate = false) => {
 /**
  * カテゴリーの更新処理
  */
-const updateCategory = (id) => {
+const updateCategory = (id: number): void => {
 
   if(appCategoryUpdating.value) return;
   appCategoryUpdating.value = true;
@@ -597,16 +631,17 @@ const updateCategory = (id) => {
   removeMarker();
 
   // 一覧データを更新
-  appLocationsOnScreen.value = id === 0 ? appLocations.value : appLocations.value.filter(spot => {
+  appLocationsOnScreen.value = id === 0 ? appLocations.value! : appLocations.value!.filter(spot => {
     const categories = spot.category.toString().split(',').map(c => c.trim());
     return categories.includes(id.toString());
   });
 
   // マップのソースデータを更新
-  const geojson = convertGeojson(appLocationsOnScreen.value);
-  appMap.value.getSource('marker').setData(geojson);
+  const geojson = convertGeojson(appLocationsOnScreen.value!);
+  const source = appMap.value!.getSource('marker') as GeoJSONSource;
+  source.setData(geojson);
 
-  appMap.value.once('idle', () => {
+  appMap.value!.once('idle', () => {
     updateMarker(true);
     setTimeout(() => {
       updateMarkerZindex();
@@ -620,19 +655,19 @@ const updateCategory = (id) => {
 /**
  * 記事の表示処理
  */
-const showArticle = (articleData, updateZoom = false) => {
+const showArticle = (articleData: Location, updateZoom: boolean = false): void => {
   appArticleLast.value = appArticle.value = articleData;
 
   nextTick(() => {
     setTimeout(() => {
 
-      appMap.value.resize();
+      appMap.value!.resize();
 
       // 中心座標をマーカー座標に更新
-      const currentZoom = appMap.value.getZoom();
+      const currentZoom = appMap.value!.getZoom();
       const zoom = updateZoom && currentZoom < 12 ? 12 : currentZoom;
-      const center = appCluster.value?.length ? [appCluster.value[0].longitude, appCluster.value[0].latitude] : [appArticle.value.longitude, appArticle.value.latitude];
-      appMap.value.easeTo({
+      const center = appCluster.value?.length ? [appCluster.value[0].longitude, appCluster.value[0].latitude] : [appArticle.value!.longitude, appArticle.value!.latitude];
+      appMap.value!.easeTo({
         center: center,
         zoom: zoom,
         duration: 500
@@ -653,15 +688,15 @@ const showArticle = (articleData, updateZoom = false) => {
 /**
  * 記事の非表示処理
  */
-const closeArticle = () => {
+const closeArticle = (): void => {
   appCluster.value = null;
   appArticle.value = null;
 
   nextTick(() => {
     setTimeout(() => {
-      const center = appMap.value.getCenter();
-      appMap.value.resize();
-      appMap.value.setCenter(center);
+      const center = appMap.value!.getCenter();
+      appMap.value!.resize();
+      appMap.value!.setCenter(center);
 
       // マーカーの選択状態を解除
       document.querySelectorAll('.marker.is-selected').forEach(el => el.classList.remove('is-selected'));
