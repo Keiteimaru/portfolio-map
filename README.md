@@ -21,3 +21,5 @@ URL:https://portfolio-q3l8v5m1x6kp.vercel.app/
 | 2025-11-29 | 初回アニメーション追加＆既存処理調整 |
 | 2025-12-06 | Nuxt + Typescriptの学習含めて移管作業中 |
 
+> **Nuxt + Typescript移管版はこちら**
+> [portfolio-map-nuxt (GitHub)](https://github.com/Keiteimaru/portfolio-map-nuxt)
